@@ -6,6 +6,8 @@ Authors: Matthew Jasper
 import FLT.Mathlib.Topology.Algebra.Valued.ValuationTopology
 import FLT.Mathlib.Algebra.Order.GroupWithZero
 import Mathlib.RingTheory.DedekindDomain.AdicValuation
+import Mathlib.RingTheory.DiscreteValuationRing.Basic
+import Mathlib.NumberTheory.RamificationInertia.Basic
 
 /-!
 
@@ -384,5 +386,30 @@ theorem denseRange_of_prodAlgebraMap {ι : Type*} [Fintype ι]
   intro x
   obtain ⟨k, y, hy, hx⟩ := adicCompletion.eq_mul_pi_adicCompletionIntegers K valuation x
   exact hx ▸ hmul y (hint hy) k
+
+section IsDiscreteValuationRing
+
+instance instDiscreteValuationRingAdicCompletionIntegers :
+    IsDiscreteValuationRing (v.adicCompletionIntegers K) := by
+  sorry
+
+end IsDiscreteValuationRing
+
+section InertiaDegree
+
+/-- The maximal ideal of the integers of the completion of `v`. -/
+noncomputable abbrev completionIdeal : Ideal (v.adicCompletionIntegers K) :=
+  IsLocalRing.maximalIdeal (adicCompletionIntegers K v)
+
+lemma completion_ne_bot : completionIdeal K v ≠ ⊥ := IsDiscreteValuationRing.not_a_field _
+
+/-- The unique element of the HeightOneSpectrum of the integers of the completion of `v`. -/
+noncomputable abbrev to_completion :
+    HeightOneSpectrum (v.adicCompletionIntegers K) where
+  asIdeal := completionIdeal K v
+  isPrime := Ideal.IsMaximal.isPrime' _
+  ne_bot := completion_ne_bot K v
+
+end InertiaDegree
 
 end IsDedekindDomain.HeightOneSpectrum
