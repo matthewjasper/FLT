@@ -22,6 +22,7 @@ import Mathlib.Topology.Algebra.Algebra.Equiv
 import Mathlib.Topology.Algebra.Module.ModuleTopology
 import Mathlib.Topology.Algebra.Valued.NormedValued
 import Mathlib.RingTheory.Valuation.RankOne
+import Mathlib.RingTheory.Flat.Basic
 import Mathlib.Topology.Algebra.Module.FiniteDimension
 import FLT.DedekindDomain.AdicValuation
 import FLT.DedekindDomain.IntegralClosure
@@ -928,5 +929,61 @@ noncomputable def adicCompletionComapContinuousAlgEquiv (v : HeightOneSpectrum A
     __ := adicCompletionComapAlgEquiv A K L B v
     __ := adicCompletionComapRightContinuousAlgEquiv A K L B v
   }
+
+/-- The A-module isomorphism `B ⊗[A] K_v ≅ ∏_{w|v} L_w`. -/
+noncomputable def adicCompletionComapIntegerLinearEquiv (v : HeightOneSpectrum A) :
+    B ⊗[A] v.adicCompletion K ≃ₗ[A] ∀ w : v.Extension B, w.1.adicCompletion L :=
+  (LinearEquivTensorProductModule A K L B (v.adicCompletion K)).symm.trans
+    ((adicCompletionComapAlgEquiv A K L B v).toLinearEquiv.restrictScalars A)
+
+/-- The canonical A-linear map `B ⊗[A] 𝓞_v → B ⊗[A] K_v`. -/
+noncomputable def adicCompletionTensorIntegerCoe :
+    B ⊗[A] (v.adicCompletionIntegers K) →ₗ[A] B ⊗[A] (v.adicCompletion K) :=
+  TensorProduct.map LinearMap.id
+    (Algebra.algHom A (adicCompletionIntegers K v) (adicCompletion K v)).toLinearMap
+
+noncomputable def integerSubmodule (v : HeightOneSpectrum A) : Submodule A (adicCompletion K v) :=
+  let s : Submodule (adicCompletionIntegers K v) _ := (adicCompletionIntegers K v).toSubmodule
+  s.restrictScalars A
+
+theorem adicCompletionComapIntegerLinearEquiv_bijOn (v : HeightOneSpectrum A) :
+    Set.BijOn (adicCompletionComapIntegerLinearEquiv A K L B v)
+    (LinearMap.range <| adicCompletionTensorIntegerCoe A K B v)
+    (Submodule.pi Set.univ fun (w : Extension B v) ↦ integerSubmodule B L w.val) := by
+  have hb : Set.BijOn _ (LinearMap.range <| adicCompletionTensorIntegerCoe A K B v) _ :=
+    Equiv.bijOn_image (adicCompletionComapIntegerLinearEquiv A K L B v).toEquiv
+  suffices ((adicCompletionComapIntegerLinearEquiv A K L B v).toEquiv ''
+      (LinearMap.range (adicCompletionTensorIntegerCoe A K B v))) =
+      Submodule.pi Set.univ
+      (fun (w : Extension B v) ↦ (integerSubmodule B L w.val).restrictScalars A) by
+    rw [this] at hb
+    exact hb
+  have hrange := adicCompletionComapAlgEquiv_integral A K L B v
+  apply_fun SetLike.coe at hrange
+  apply Eq.trans _ hrange
+  rw [LinearMap.range_coe, ← Set.range_comp, AlgHom.coe_range]
+  apply congr_arg
+  letI : SMulCommClass K B L := SMulCommClass.of_commMonoid K B L
+  show ⇑(((adicCompletionComapIntegerLinearEquiv A K L B v).toLinearMap).comp
+      (adicCompletionTensorIntegerCoe A K B v)) =
+      ⇑(((tensorAdicCompletionComapAlgHom A K L B v).toLinearMap.restrictScalars A).comp
+      ((tensorAdicCompletionIntegersTo A K L B v).toLinearMap.restrictScalars A))
+  apply congr_arg
+  apply TensorProduct.ext'
+  intro x y
+  ext w
+  letI := comap_integer_algebra' A K L B w.prop
+  have : ((Algebra.ofId B (L ⊗[K] adicCompletion K v)) x) = ((algebraMap B L x) ⊗ₜ 1) :=
+    rfl
+  simp [tensorAdicCompletionIntegersTo, adicCompletionTensorIntegerCoe,
+    adicCompletionComapIntegerLinearEquiv, adicCompletionComapContinuousAlgEquiv,
+    LinearEquivTensorProductModule_symm_tmul, adicCompletionComapAlgEquiv,
+    tensorAdicCompletionComapAlgHom, SemialgHom.baseChange_of_algebraMap_tmul, this,
+    adicCompletionComapSemialgHom', -mul_eq_mul_left_iff]
+  rfl
+
+-- Mathlib #25334
+instance [NoZeroSMulDivisors A B] : Module.Flat A B := by
+  sorry
 
 end IsDedekindDomain.HeightOneSpectrum
