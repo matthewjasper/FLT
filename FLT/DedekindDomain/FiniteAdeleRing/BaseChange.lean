@@ -62,20 +62,36 @@ open IsDedekindDomain HeightOneSpectrum
 
 open scoped TensorProduct -- ⊗ notation for tensor product
 
+lemma tendsTo_comap_confinite [FaithfulSMul A B] :
+    Filter.Tendsto (comap A (B:=B)) Filter.cofinite Filter.cofinite :=
+  have : FaithfulSMul A (FractionRing B) := FractionRing.instFaithfulSMul A B
+  letI : Algebra (FractionRing A) (FractionRing B) :=
+    FractionRing.liftAlgebra A (FractionRing B)
+  (Filter.Tendsto.cofinite_of_finite_preimage_singleton <|
+    Extension.finite A (FractionRing A) (FractionRing B) B)
+
+omit [IsIntegralClosure B A L] [FiniteDimensional K L] in
+lemma confinite_mapsTo_adicCompletionComapSemialgHom :
+    ∀ᶠ (w : HeightOneSpectrum B) in Filter.cofinite,
+    Set.MapsTo (adicCompletionComapSemialgHom A K L B (comap A w) w rfl)
+      (adicCompletionIntegers K (comap A w)) (adicCompletionIntegers L w) := by
+  apply Filter.Eventually.of_forall
+  intro w
+  have : FaithfulSMul A B := FaithfulSMul.of_field_isFractionRing A B K L
+  have := adicCompletionComapSemialgHom.mapadicCompletionIntegers A K L B (comap A w) w rfl
+  exact Set.image_subset_iff.1 this
+
 /-- The ring homomorphism `𝔸_K^∞ → 𝔸_L^∞` for `L/K` an extension of number fields.-/
 noncomputable def FiniteAdeleRing.mapRingHom :
-    FiniteAdeleRing A K →+* FiniteAdeleRing B L := RestrictedProduct.mapRingHom
-  (fun (v : HeightOneSpectrum A) ↦ v.adicCompletion K)
-  (fun (w : HeightOneSpectrum B) ↦ w.adicCompletion L)
-  (HeightOneSpectrum.comap A)
-  (Filter.Tendsto.cofinite_of_finite_preimage_singleton <| Extension.finite A K L B)
-  (fun w ↦ adicCompletionComapSemialgHom A K L B (w.comap A) w rfl)
-  (by
-    apply Filter.Eventually.of_forall
-    intro w
-    have : FaithfulSMul A B := FaithfulSMul.of_field_isFractionRing A B K L
-    have := adicCompletionComapSemialgHom.mapadicCompletionIntegers A K L B (comap A w) w rfl
-    exact Set.image_subset_iff.1 this)
+    FiniteAdeleRing A K →+* FiniteAdeleRing B L :=
+  have := FaithfulSMul.of_field_isFractionRing A B K L;
+  RestrictedProduct.mapRingHom
+    (fun (v : HeightOneSpectrum A) ↦ v.adicCompletion K)
+    (fun (w : HeightOneSpectrum B) ↦ w.adicCompletion L)
+    (HeightOneSpectrum.comap A)
+    (tendsTo_comap_confinite A B)
+    (fun w ↦ adicCompletionComapSemialgHom A K L B (w.comap A) w rfl)
+    (confinite_mapsTo_adicCompletionComapSemialgHom A K L B)
 
 /-- The ring homomorphism `𝔸_K^∞ → 𝔸_L^∞` for `L/K` an extension of number fields,
 as a morphism lying over the canonical map `K → L`. -/
@@ -93,8 +109,13 @@ noncomputable
 instance BaseChange.algebra : Algebra (FiniteAdeleRing A K) (FiniteAdeleRing B L) :=
   RingHom.toAlgebra (FiniteAdeleRing.mapRingHom A K L B)
 
-lemma FiniteAdeleRing.mapSemialgHom_continuous : Continuous (mapSemialgHom A K L B) :=
-  sorry
+omit [IsIntegralClosure B A L] [FiniteDimensional K L] in
+lemma FiniteAdeleRing.mapSemialgHom_continuous : Continuous (mapSemialgHom A K L B) := by
+  have : FaithfulSMul A B := FaithfulSMul.of_field_isFractionRing A B K L
+  apply Continuous.restrictedProduct_map (tendsTo_comap_confinite A B)
+    (confinite_mapsTo_adicCompletionComapSemialgHom A K L B)
+  intro w
+  apply adicCompletionComapSemialgHom_continuous A K L B _ w rfl
 
 attribute [instance 100] RestrictedProduct.instSMulCoeOfSMulMemClass
 -- otherwise
@@ -150,14 +171,6 @@ noncomputable def FiniteAdeleRing.tensor_equiv_restrictedProduct :
 
 noncomputable instance baseChangeIntegerAlgebra : Algebra A (FiniteAdeleRing B L) :=
   RingHom.toAlgebra <| (algebraMap B _).comp (algebraMap A B)
-
-lemma tendsTo_comap_confinite [FaithfulSMul A B] :
-    Filter.Tendsto (comap A (B:=B)) Filter.cofinite Filter.cofinite :=
-  have : FaithfulSMul A (FractionRing B) := FractionRing.instFaithfulSMul A B
-  letI : Algebra (FractionRing A) (FractionRing B) :=
-    FractionRing.liftAlgebra A (FractionRing B)
-  (Filter.Tendsto.cofinite_of_finite_preimage_singleton <|
-    Extension.finite A (FractionRing A) (FractionRing B) B)
 
 noncomputable def baseChangeIntegerAlgebra' (w : HeightOneSpectrum B) :
     Algebra A (adicCompletion L w) :=
