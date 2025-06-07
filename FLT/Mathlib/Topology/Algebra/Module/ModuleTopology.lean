@@ -480,7 +480,7 @@ instance _root_.Prod.instFinite_leftAlgebra : Module.Finite (A × B) A :=
 instance _root_.Prod.instFinite_rightAlgebra : Module.Finite (A × B) B :=
   Module.Finite.of_surjective (LinearMap.snd (A × B) A B) LinearMap.snd_surjective
 
-variable  [τA : TopologicalSpace A] [τB : TopologicalSpace B] [TopologicalSpace M]
+variable  [TopologicalSpace A] [TopologicalSpace B] [TopologicalSpace M]
   [TopologicalSpace N] [IsModuleTopology A M] [IsModuleTopology B N] [IsTopologicalRing A]
   [IsTopologicalRing B]
 
@@ -530,5 +530,28 @@ theorem locallyCompactSpaceOfFinite [LocallyCompactSpace R] [Module.Finite R M] 
     h ▸ Fintype.range_linearCombination R φ
 
 end locally_compact
+
+section finite
+
+variable {R M : Type*} [CommRing R] [AddCommGroup M] [Module R M] [Module.Finite R M]
+  [Module.Free R M] [TopologicalSpace R] [TopologicalSpace M] [IsTopologicalRing R]
+  [ContinuousAdd M] [ContinuousSMul R M]
+
+theorem of_finite_continuousFunctionals (hf : ∀ (f : M →ₗ[R] R), Continuous f) :
+    IsModuleTopology R M := by
+  let g := Module.Free.repr R M
+  let h := Finsupp.linearEquivFunOnFinite R R (Module.Free.ChooseBasisIndex R M)
+  let c : M ≃L[R] Module.Free.ChooseBasisIndex R M → R := {
+    __ := g.trans h
+    continuous_toFun := by
+      apply continuous_pi
+      intro i
+      apply hf ((LinearMap.proj i) ∘ₗ (g.trans h).toLinearMap)
+    continuous_invFun :=
+      IsModuleTopology.continuous_of_linearMap (g.trans h).symm.toLinearMap
+  }
+  apply IsModuleTopology.iso c.symm
+
+end finite
 
 end IsModuleTopology

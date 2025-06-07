@@ -9,6 +9,7 @@ import FLT.Mathlib.Algebra.Module.Submodule.Basic
 import FLT.Mathlib.NumberTheory.RamificationInertia.Basic
 import FLT.Mathlib.Topology.Algebra.Module.Equiv
 import FLT.Mathlib.Topology.Algebra.Module.ModuleTopology
+import FLT.Mathlib.Topology.Algebra.RestrictedProduct
 import FLT.Mathlib.Topology.Algebra.UniformRing
 import FLT.Mathlib.Topology.Algebra.Valued.ValuationTopology
 import FLT.Mathlib.Topology.Algebra.Valued.WithVal
@@ -122,13 +123,22 @@ attribute [instance 100] RestrictedProduct.instSMulCoeOfSMulMemClass
 -- #synth SMul (FiniteAdeleRing A K) (FiniteAdeleRing B L)
 -- spends 2 seconds failing to find `SMul (FiniteAdeleRing A K) (adicCompletion L w)
 
-lemma BaseChange.isModuleTopology : IsModuleTopology (FiniteAdeleRing A K) (FiniteAdeleRing B L) :=
-  sorry -- this should follow from the fact that L_w has the K_v-module topology? Hopefully
-  -- **TODO** this needs an issue number.
+noncomputable instance baseChangeAlgebra : Algebra K (FiniteAdeleRing B L) :=
+  Algebra.compHom _ (algebraMap K L)
+
+noncomputable instance baseChangeScalarTower : IsScalarTower K L (FiniteAdeleRing B L) :=
+  IsScalarTower.of_algebraMap_eq' rfl
+
+noncomputable instance baseChangeScalarTower' :
+    IsScalarTower K (FiniteAdeleRing A K) (FiniteAdeleRing B L) := by
+  apply IsScalarTower.of_algebraMap_eq
+  intro x
+  nth_rw 2 [RingHom.algebraMap_toAlgebra]
+  symm
+  exact SemialgHom.commutes (FiniteAdeleRing.mapSemialgHom A K L B) x
 
 noncomputable instance : TopologicalSpace (L ⊗[K] FiniteAdeleRing A K) :=
   moduleTopology (FiniteAdeleRing A K) (L ⊗[K] FiniteAdeleRing A K)
-
 
 omit [Module.Finite A B] [IsDedekindDomain B] in
 theorem range_adicCompletionTensorIntegerCoe_eq_lTensorRestriction (v : HeightOneSpectrum A) :
@@ -186,17 +196,6 @@ noncomputable def FiniteAdeleRing.restrictedProduct_tensorProduct_equiv_restrict
   LinearEquiv.restrictedProductCongrRight
     (adicCompletionComapIntegerLinearEquiv A K L B)
     (Filter.Eventually.of_forall <| adicCompletionComapIntegerLinearEquiv_bijOn A K L B)
-
-noncomputable instance baseChangeAlgebra : Algebra K (FiniteAdeleRing B L) :=
-  RingHom.toAlgebra <| (algebraMap L _).comp (algebraMap K L)
-
-noncomputable instance baseChangeScalarTower :
-    IsScalarTower K (FiniteAdeleRing A K) (FiniteAdeleRing B L) := by
-  apply IsScalarTower.of_algebraMap_eq
-  intro x
-  nth_rw 2 [RingHom.algebraMap_toAlgebra]
-  symm
-  exact SemialgHom.commutes (FiniteAdeleRing.mapSemialgHom A K L B) x
 
 open scoped RestrictedProduct in
 noncomputable def FiniteAdeleRing.restrictedProduct_prod_equiv :
@@ -324,13 +323,211 @@ noncomputable def FiniteAdeleRing.baseChangeAlgEquiv :
     (SemialgHom.baseChange_of_algebraMap <| FiniteAdeleRing.mapSemialgHom A K L B)
     (FiniteAdeleRing.baseChange_bijective A K L B)
 
+/-- The `𝔸_K^∞`-algebra isomorphism `L ⊗_K 𝔸_K^∞ ≅ 𝔸_L^∞`. -/
+noncomputable def FiniteAdeleRing.baseChangeAdeleAlgEquiv :
+    L ⊗[K] FiniteAdeleRing A K ≃ₐ[FiniteAdeleRing A K] FiniteAdeleRing B L where
+  __ := SemialgHom.baseChangeRightOfAlgebraMap <| FiniteAdeleRing.mapSemialgHom A K L B
+  __ := FiniteAdeleRing.baseChangeAlgEquiv A K L B
+
+open RestrictedProduct in
+noncomputable def FiniteAdeleRing.flattenBaseChange :
+    Πʳ (v : HeightOneSpectrum A), [(w : Extension B v) → w.val.adicCompletion L,
+        AddSubgroup.pi Set.univ fun (w : Extension B v) ↦
+        (w.val.adicCompletionIntegers L).toAddSubgroup] ≃ₜ FiniteAdeleRing B L :=
+  RestrictedProduct.flatten_homeomorph'
+    (G := fun (w : HeightOneSpectrum B) ↦ w.adicCompletion L)
+    (fun (w : HeightOneSpectrum B) ↦ w.adicCompletionIntegers L)
+    (Filter.Tendsto.cofinite_of_finite_preimage_singleton <| Extension.finite A K L B)
+
+open RestrictedProduct in
+omit [IsIntegralClosure B A L] [FiniteDimensional K L] in
+@[simp]
+lemma FiniteAdeleRing.flattenBaseChange_apply (x : Πʳ (v : HeightOneSpectrum A),
+    [(w : Extension B v) → w.val.adicCompletion L,
+      AddSubgroup.pi Set.univ fun (w : Extension B v) ↦
+      (w.val.adicCompletionIntegers L).toAddSubgroup]) (w : HeightOneSpectrum B) :
+    FiniteAdeleRing.flattenBaseChange A K L B x w = x (comap A w) ⟨w, rfl⟩ :=
+  rfl
+
+open RestrictedProduct in
+set_option maxHeartbeats 400000 in
+noncomputable def FiniteAdeleRing.functional_component (v : HeightOneSpectrum A)
+    (f : FiniteAdeleRing B L →ₗ[FiniteAdeleRing A K] FiniteAdeleRing A K) :
+    ((w : Extension B v) → w.val.adicCompletion L) →ₗ[adicCompletion K v] adicCompletion K v where
+  toFun x :=
+    letI := Classical.typeDecidableEq (HeightOneSpectrum A)
+    let x' : Πʳ (v : HeightOneSpectrum A), [(w : Extension B v) → w.val.adicCompletion L,
+        AddSubgroup.pi Set.univ fun (w : Extension B v) ↦
+        (w.val.adicCompletionIntegers L).toAddSubgroup] :=
+      RestrictedProduct.single _ _ v x
+    f (FiniteAdeleRing.flattenBaseChange A K L B x') v
+  map_add' x y := by
+    dsimp only
+    rw [← add_apply, ← map_add]
+    congr
+    ext w
+    simp only [flattenBaseChange_apply, add_apply]
+    rw [← RestrictedProduct.single_add, ← Pi.add_apply]
+    rfl
+  map_smul' a x := by
+    classical
+    dsimp
+    let a' : FiniteAdeleRing A K := RestrictedProduct.single _ _ v a
+    have hmul (x : FiniteAdeleRing A K) : a * (x v) = (a' * x) v := by
+      simp [a']
+    rw [hmul, ← Algebra.id.smul_eq_mul, ← map_smul f, Algebra.smul_def a', Algebra.smul_def a]
+    congr
+    ext w
+    simp only [flattenBaseChange_apply, mul_apply]
+    letI : Algebra (adicCompletion K (comap A w)) (adicCompletion L w) :=
+      comap_algebra A K L B rfl
+    by_cases hc : comap A w = v
+    . obtain rfl := hc
+      simp only [RestrictedProduct.single_apply_same]
+      rw [Pi.mul_apply]
+      congr
+      show _ = algebraMap _ _ (a' (comap A w))
+      simp only [single_apply_same, a']
+      rfl
+    . rw [RestrictedProduct.single_apply_ne _ _ _ hc, RestrictedProduct.single_apply_ne _ _ _ hc,
+        Pi.zero_apply, mul_zero]
+
+open scoped Classical in
+lemma FiniteAdeleRing.single_mul_apply (x : FiniteAdeleRing A K) (v : HeightOneSpectrum A) :
+    x v = ((RestrictedProduct.single _ _ v 1 : FiniteAdeleRing A K) * x) v := by
+  simp
+
+open scoped Classical in
+lemma FiniteAdeleRing.single_smul_apply (x : FiniteAdeleRing A K) (v : HeightOneSpectrum A) :
+    x v = ((RestrictedProduct.single _ _ v 1 : FiniteAdeleRing A K) • x) v := by
+  simp
+
+open RestrictedProduct in
+noncomputable def FiniteAdeleRing.functional_component_apply_flatten_symm (v : HeightOneSpectrum A)
+    (f : FiniteAdeleRing B L →ₗ[FiniteAdeleRing A K] FiniteAdeleRing A K) (x : FiniteAdeleRing B L)
+    : f x v = (FiniteAdeleRing.functional_component A K L B v f)
+      ((FiniteAdeleRing.flattenBaseChange A K L B).symm x v) := by
+  classical
+  show _ = (FiniteAdeleRing.functional_component A K L B v f) (fun w ↦ x w.val)
+  simp only [functional_component, LinearMap.coe_mk, AddHom.coe_mk]
+  rw [FiniteAdeleRing.single_smul_apply, ← map_smul]
+  congr
+  ext w
+  rw [flattenBaseChange_apply]
+  show _ * x w = _
+  by_cases h : comap A w = v
+  . obtain rfl := h
+    simp [mapRingHom]
+  . simp [mapRingHom, RestrictedProduct.single_apply_ne _ _ _ h]
+
+omit [IsIntegralClosure B A L] in
+open RestrictedProduct in
+lemma BaseChange.continuous_linearFunctional
+    (f : FiniteAdeleRing B L →ₗ[FiniteAdeleRing A K] FiniteAdeleRing A K)
+    : Continuous f := by
+  classical
+  let g := FiniteAdeleRing.flattenBaseChange A K L B
+  rw [← Homeomorph.comp_continuous_iff' g]
+  let hl (v : HeightOneSpectrum A) : ((w : Extension B v) → w.val.adicCompletion L)
+      →ₗ[adicCompletion K v] adicCompletion K v :=
+    FiniteAdeleRing.functional_component A K L B v f
+  let h' (x : Πʳ (v : HeightOneSpectrum A), [(w : Extension B v) → adicCompletion L w.1,
+      Set.univ.pi fun w ↦ adicCompletionIntegers L w.1]) :=
+    fun (v : HeightOneSpectrum A) ↦ hl v (x v)
+  have heq : h' = (DFunLike.coe ∘ f) ∘ g := by
+    rw [← Homeomorph.coe_toEquiv, ← Equiv.comp_symm_eq g.toEquiv]
+    ext x v'
+    rw [Function.comp_apply, Function.comp_apply,
+      FiniteAdeleRing.functional_component_apply_flatten_symm]
+    rfl
+  have hval (x) (v') : h' x v' = f (g x) v' := by
+    rw [heq]
+    rfl
+  have hmap : ∀ᶠ (v : HeightOneSpectrum A) in Filter.cofinite,
+      Set.MapsTo (hl v) (Set.univ.pi fun w ↦ adicCompletionIntegers L w.1)
+      (adicCompletionIntegers K v) := by
+    have p (v : HeightOneSpectrum A) :
+        ¬Set.MapsTo (hl v) (Set.univ.pi fun w ↦ adicCompletionIntegers L w.1)
+        (adicCompletionIntegers K v) → ∃ x : (Set.univ.pi fun w ↦ adicCompletionIntegers L w.1),
+            hl v x.1 ∉ adicCompletionIntegers K v := by
+      intro h
+      unfold Set.MapsTo at h
+      exact Classical.exists_not_of_not_forall (fun m ↦ h (fun x hx ↦ @m ⟨x, hx⟩))
+    choose cf hcf using p
+    let y (v : HeightOneSpectrum A) : (Set.univ.pi fun (w : Extension B v) ↦
+        SetLike.coe (adicCompletionIntegers L w.1)) :=
+      if h : Set.MapsTo (hl v) (Set.univ.pi fun w ↦ adicCompletionIntegers L w.1)
+        (adicCompletionIntegers K v)
+      then
+        (0 : AddSubgroup.pi Set.univ
+          fun (w : Extension B v) ↦ (adicCompletionIntegers L w.1).toAddSubgroup)
+      else
+        cf v h
+    let x : Πʳ (v : HeightOneSpectrum A), [(w : Extension B v) → adicCompletion L w.1,
+        Set.univ.pi fun w ↦ adicCompletionIntegers L w.1] :=
+      ⟨fun v ↦ y v, by filter_upwards with v using (y v).prop⟩
+    filter_upwards [(f (g x)).prop] with v' hv
+    by_contra hmap
+    change f (g x) v' ∈ _ at hv
+    rw [← hval] at hv
+    -- change hl v' (x v') ∈ _ at hv
+    dsimp [x, h', y] at hv
+    rw [dite_cond_eq_false (eq_false hmap)] at hv
+    exact hcf v' hmap hv
+  let h := RestrictedProduct.congrRight (ℱ := Filter.cofinite)
+    (C := (fun v ↦ Set.univ.pi (fun (w : Extension B v) ↦ (adicCompletionIntegers L w.val))))
+    (D := (fun v ↦ v.adicCompletionIntegers K)) (fun v ↦ hl v) hmap
+  have : f ∘ g = h := by
+    ext x v'
+    show _ = h' x v'
+    rw [hval]
+    rfl
+  rw [this]
+  unfold h
+  apply Continuous.restrictedProduct_congrRight
+  intro v
+  show Continuous (hl v)
+  letI := comap_pi_algebra A K L B v |>.toSMul
+  have : IsModuleTopology (adicCompletion K v) ((w : Extension B v) → w.val.adicCompletion L) :=
+    prodAdicCompletionComap_isModuleTopology A K L B v
+  apply IsModuleTopology.continuous_of_linearMap
+
+lemma BaseChange.isModuleTopology :
+    IsModuleTopology (FiniteAdeleRing A K) (FiniteAdeleRing B L) := by
+  have : Module.Finite (FiniteAdeleRing A K) (FiniteAdeleRing B L) := by
+    apply Module.Finite.equiv (FiniteAdeleRing.baseChangeAdeleAlgEquiv A K L B).toLinearEquiv
+  have : Module.Free (FiniteAdeleRing A K) (FiniteAdeleRing B L) := by
+    apply Module.Free.of_equiv (FiniteAdeleRing.baseChangeAdeleAlgEquiv A K L B).toLinearEquiv
+  have htm : IsTopologicalModule (FiniteAdeleRing A K) (FiniteAdeleRing B L) := by
+    rw [IsModuleTopology.iff_Continuous_algebraMap]
+    apply FiniteAdeleRing.mapSemialgHom_continuous
+  have := htm.toContinuousSMul
+  letI : Module (FiniteAdeleRing A K) (FiniteAdeleRing B L) :=
+    inferInstance
+  apply IsModuleTopology.of_finite_continuousFunctionals
+  apply BaseChange.continuous_linearFunctional
+
+/-- The continuous `𝔸_K^∞`-algebra isomorphism `L ⊗_K 𝔸_K^∞ ≅ 𝔸_L^∞` -/
+noncomputable def FiniteAdeleRing.baseChangeAdeleContinuousAlgEquiv :
+    L ⊗[K] FiniteAdeleRing A K ≃A[FiniteAdeleRing A K] FiniteAdeleRing B L :=
+  have := BaseChange.isModuleTopology A K L B
+  IsModuleTopology.continuousAlgEquivOfAlgEquiv <|
+    baseChangeAdeleAlgEquiv A K L B
+
 /-- The continuous `L`-algebra isomorphism `L ⊗_K 𝔸_K^∞ ≅ 𝔸_L^∞` -/
 noncomputable def FiniteAdeleRing.baseChangeContinuousAlgEquiv :
     L ⊗[K] FiniteAdeleRing A K ≃A[L] FiniteAdeleRing B L where
-  __ := FiniteAdeleRing.baseChangeAlgEquiv A K L B
-  continuous_toFun := sorry
-  continuous_invFun := sorry
-  -- TODO needs issue number
+  __ := baseChangeAlgEquiv A K L B
+  __ := baseChangeAdeleContinuousAlgEquiv A K L B
 
+lemma FiniteAdeleRing.baseChangeAdeleContinuousAlgEquiv_apply (x : L) (y : FiniteAdeleRing A K) :
+    (FiniteAdeleRing.baseChangeAdeleContinuousAlgEquiv A K L B) (x ⊗ₜ y) =
+    (algebraMap _ _ x) * (algebraMap _ _ y) :=
+  rfl
+
+lemma FiniteAdeleRing.baseChangeContinuousAlgEquiv_apply (x : L) (y : FiniteAdeleRing A K) :
+    (FiniteAdeleRing.baseChangeContinuousAlgEquiv A K L B) (x ⊗ₜ y) =
+    (algebraMap _ _ x) * (algebraMap _ _ y) :=
+  rfl
 
 end IsDedekindDomain

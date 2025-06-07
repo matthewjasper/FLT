@@ -78,9 +78,10 @@ instance : Module R (Πʳ i, [A i, B i]_[𝓕]) :=
 
 end Module
 
-@[simp]
-lemma one_apply [Π i, One (R i)] [∀ i, OneMemClass (S i) (R i)] {i : ι} :
-  (1 : Πʳ i, [R i, B i]_[ℱ]) i = 1 := rfl
+@[to_additive (attr := simp)]
+lemma one_apply [Π i, One (R i)] [∀ i, OneMemClass (S i) (R i)] (i : ι) :
+    (1 : Πʳ i, [R i, B i]_[ℱ]) i = 1 :=
+  rfl
 
 -- I'm avoiding using these if possible
 
@@ -609,3 +610,219 @@ lemma mem_coset_and_mulSupport_subset_of_isProductAt
       simp_all
     simp only [smul_eq_mul, mul_assoc, mul_inv_cancel_left, mul_right_inj, hcomm]⟩,
     mulSupport_mul_subset huᵢ hg⟩
+
+section flatten
+
+variable {ι₂ : Type*} {𝒢 : Filter ι₂} {f : ι → ι₂} (C)
+
+variable (hf : Filter.Tendsto f ℱ 𝒢) in
+/-- The canonical map from a restricted product of products over fibres of a map on indexing sets
+to the restricted product over the original indexing set. -/
+def flatten : Πʳ j, [Π (i : f ⁻¹' {j}), G i, Set.pi Set.univ (fun (i : f ⁻¹' {j}) => C i)]_[𝒢] →
+    Πʳ i, [G i, C i]_[ℱ] :=
+  map _ G f hf (fun i x ↦ x ⟨i, rfl⟩) (by filter_upwards with x y hy using hy ⟨x, rfl⟩ trivial)
+
+@[simp]
+lemma flatten_apply (hf : Filter.Tendsto f ℱ 𝒢) (x) (i : ι) :
+    flatten C hf x i = x (f i) ⟨i, rfl⟩ :=
+  rfl
+
+variable (hf : Filter.comap f 𝒢 = ℱ)
+
+/-- The canonical bijection from a restricted product of products over fibres of a map on indexing
+sets to the restricted product over the original indexing set. -/
+def flatten_equiv :
+    Πʳ j, [Π (i : f ⁻¹' {j}), G i, Set.pi Set.univ (fun (i : f ⁻¹' {j}) => C i)]_[𝒢] ≃
+    Πʳ i, [G i, C i]_[ℱ] where
+  toFun := flatten C (by rw [Filter.tendsto_iff_comap]; exact hf.ge)
+  invFun := fun ⟨x, hx⟩ ↦ ⟨fun _ i ↦ x i, by
+    rw [← hf, Filter.eventually_comap] at hx
+    filter_upwards [hx] with j hj ⟨i, hi⟩ _ using hj i hi⟩
+  left_inv := by
+    intro ⟨x, hx⟩
+    ext _ ⟨i, rfl⟩
+    rfl
+  right_inv x := by ext i; rfl
+
+@[simp]
+lemma flatten_equiv_apply (x) (i : ι) :
+    flatten_equiv C hf x i = x (f i) ⟨i, rfl⟩ :=
+  rfl
+
+@[simp]
+lemma flatten_equiv_symm_apply (x) (i : ι₂) (j : f ⁻¹' {i}) :
+    (flatten_equiv C hf).symm x i j = x j.1 :=
+  rfl
+
+variable [Π i, TopologicalSpace (G i)]
+
+/-- The canonical homeomorphism from a restricted product of products over fibres of a map on
+indexing sets to the restricted product over the original indexing set. -/
+def flatten_homeomorph :
+    Πʳ j, [Π (i : f ⁻¹' {j}), G i, Set.pi Set.univ (fun (i : f ⁻¹' {j}) => C i)]_[𝒢] ≃ₜ
+    Πʳ i, [G i, C i]_[ℱ] where
+  __ := flatten_equiv C hf
+  continuous_toFun := by
+    dsimp only [flatten_equiv]
+    apply Continuous.restrictedProduct_map
+    fun_prop
+  continuous_invFun := by
+    dsimp only [flatten_equiv]
+    rw [continuous_dom]
+    intro S hS
+    set T := (f '' Sᶜ)ᶜ with hTval
+    have hT : 𝒢 ≤ Filter.principal T := by
+      rwa [Filter.le_principal_iff, hTval, ← Filter.mem_comap_iff_compl, hf,
+        ← Filter.le_principal_iff]
+    let g : Πʳ i, [G i, C i]_[Filter.principal S] → Πʳ j, [Π (i : f ⁻¹' {j}), G i,
+        Set.pi Set.univ (fun (i : f ⁻¹' {j}) => C i)]_[Filter.principal T] :=
+      fun ⟨x, hx⟩ ↦ ⟨fun j i ↦ x i, by
+        have : Filter.comap f (Filter.principal T) ≤ Filter.principal S := by
+          rw [Filter.le_principal_iff, Filter.mem_comap]
+          use T
+          refine ⟨Filter.mem_principal_self T, ?_⟩
+          rw [hTval, Set.preimage_compl, Set.compl_subset_comm]
+          apply Set.subset_preimage_image
+        have hx := Filter.Eventually.filter_mono this hx
+        rw [Filter.eventually_comap] at hx
+        filter_upwards [hx] with j hj ⟨i, hi⟩ _ using hj i hi⟩
+    let hc : Continuous g := by
+      rw [continuous_rng_of_principal]
+      apply continuous_pi
+      intro j
+      apply continuous_pi
+      rintro ⟨i, rfl⟩
+      exact continuous_apply i
+    apply (continuous_inclusion hT).comp hc
+
+@[simp]
+lemma flatten_homeomorph_apply (x) (i : ι) :
+    flatten_homeomorph C hf x i = x (f i) ⟨i, rfl⟩ :=
+  rfl
+
+@[simp]
+lemma flatten_homeomorph_symm_apply (x) (i : ι₂) (j : f ⁻¹' {i}) :
+    (flatten_homeomorph C hf).symm x i j = x j.1 :=
+  rfl
+
+variable (hf : Filter.Tendsto f Filter.cofinite Filter.cofinite)
+
+/-- The equivalence given by `flatten` when both restricted products are over the cofinite
+filter. -/
+def flatten_equiv' :
+    Πʳ j, [Π (i : f ⁻¹' {j}), G i, Set.pi Set.univ (fun (i : f ⁻¹' {j}) => C i)] ≃
+    Πʳ i, [G i, C i] :=
+  have hf : Filter.comap f Filter.cofinite = Filter.cofinite := by
+    apply le_antisymm (Filter.comap_cofinite_le f) (Filter.map_le_iff_le_comap.mp hf)
+  flatten_equiv C hf
+
+omit [(i : ι) → TopologicalSpace (G i)] in
+@[simp]
+lemma flatten_equiv'_apply (x) (i : ι) :
+    flatten_equiv' C hf x i = x (f i) ⟨i, rfl⟩ :=
+  rfl
+
+omit [(i : ι) → TopologicalSpace (G i)] in
+@[simp]
+lemma flatten_equiv'_symm_apply (x) (i : ι₂) (j : f ⁻¹' {i}) :
+    (flatten_equiv' C hf).symm x i j = x j.1 :=
+  rfl
+
+/-- The homeomorphism given by `flatten` when both restricted products are over the cofinite
+filter and there's a topology on the factors. -/
+def flatten_homeomorph' :
+    Πʳ j, [Π (i : f ⁻¹' {j}), G i, Set.pi Set.univ (fun (i : f ⁻¹' {j}) => C i)] ≃ₜ
+    Πʳ i, [G i, C i] :=
+  have hf : Filter.comap f Filter.cofinite = Filter.cofinite := by
+    apply le_antisymm (Filter.comap_cofinite_le f) (Filter.map_le_iff_le_comap.mp hf)
+  flatten_homeomorph C hf
+
+@[simp]
+lemma flatten_homeomorph'_apply (x) (i : ι) :
+    flatten_homeomorph' C hf x i = x (f i) ⟨i, rfl⟩ :=
+  rfl
+
+@[simp]
+lemma flatten_homeomorph'_symm_apply (x) (i : ι₂) (j : f ⁻¹' {i}) :
+    (flatten_homeomorph' C hf).symm x i j = x j.1 :=
+  rfl
+
+end flatten
+
+section single
+
+variable {ι : Type*}
+variable (R : ι → Type*) (A : (i : ι) → Set (R i))
+variable {S : ι → Type*}
+variable [Π i, SetLike (S i) (R i)]
+variable (B : Π i, S i) [DecidableEq ι]
+
+/-- The function supported at `i`, with value `x` there, and `1` elsewhere. -/
+@[to_additive "The function supported at `i`, with value `x` there, and `0` elsewhere."]
+def mulSingle [∀ i, One (R i)] [∀ i, OneMemClass (S i) (R i)] (i : ι) (x : R i) :
+    Πʳ i, [R i, B i] where
+  val := Pi.mulSingle i x
+  property := by
+    rw [Filter.eventually_cofinite]
+    apply Set.Subsingleton.finite
+    apply Set.subsingleton_of_subset_singleton (a := i)
+    apply Set.Subset.trans _ (Pi.mulSupport_mulSingle_subset (b := x))
+    intro j hj
+    rw [Function.mem_mulSupport]
+    contrapose! hj
+    rw [Set.mem_setOf, Set.not_notMem]
+    convert one_mem (B j)
+    by_cases hi : i = j
+    · obtain rfl := hi
+      exact hj
+    · rw [Pi.mulSingle_eq_of_ne' hi]
+
+@[to_additive (attr := simp)]
+lemma mulSingle_apply_same [∀ i, One (R i)] [∀ i, OneMemClass (S i) (R i)] (i : ι) (r : R i) :
+    mulSingle R B i r i = r :=
+  Pi.mulSingle_eq_same i r
+
+@[to_additive (attr := simp)]
+lemma mulSingle_apply_ne [∀ i, One (R i)] [∀ i, OneMemClass (S i) (R i)] {i j : ι} (r : R i)
+    (h : j ≠ i) : mulSingle R B i r j = 1 :=
+  Pi.mulSingle_eq_of_ne h r
+
+@[to_additive (attr := simp)]
+lemma mulSingle_apply_ne' [∀ i, One (R i)] [∀ i, OneMemClass (S i) (R i)] {i j : ι} (r : R i)
+    (h : i ≠ j) : mulSingle R B i r j = 1 :=
+  Pi.mulSingle_eq_of_ne' h r
+
+@[to_additive (attr := simp)]
+lemma mulSingle_one [∀ i, One (R i)] [∀ i, OneMemClass (S i) (R i)] (i : ι) :
+    mulSingle R B i 1 = 1 := by
+  apply Subtype.ext
+  exact Pi.mulSingle_one i
+
+@[to_additive (attr := simp)]
+lemma mulSingle_mul [∀ i, MulOneClass (R i)] [∀ i, OneMemClass (S i) (R i)]
+    [∀ i, MulMemClass (S i) (R i)] (i : ι) (r s : R i) :
+    mulSingle R B i r * mulSingle R B i s = mulSingle R B i (r * s) := by
+  ext j
+  obtain (rfl | hi) := em (i = j)
+  · simp
+  · simp [mulSingle_apply_ne' R B _ hi]
+
+@[simp]
+lemma mul_single [∀ i, MulZeroClass (R i)] [∀ i, One (R i)] [∀ i, ZeroMemClass (S i) (R i)]
+    [∀ i, MulMemClass (S i) (R i)] (i : ι) (r : R i) (x : Πʳ i, [R i, B i]) :
+    x * single R B i r = single R B i ((x i) * r) := by
+  ext j
+  obtain (rfl | hi) := em (i = j)
+  · simp
+  · simp [single_apply_ne' R B _ hi]
+
+@[simp]
+lemma single_mul [∀ i, MulZeroClass (R i)] [∀ i, One (R i)] [∀ i, ZeroMemClass (S i) (R i)]
+    [∀ i, MulMemClass (S i) (R i)] (i : ι) (r : R i) (x : Πʳ i, [R i, B i]) :
+    x * single R B i r = single R B i ((x i) * r) := by
+  ext j
+  obtain (rfl | hi) := em (i = j)
+  · simp
+  · simp [single_apply_ne' R B _ hi]
+
+end single
