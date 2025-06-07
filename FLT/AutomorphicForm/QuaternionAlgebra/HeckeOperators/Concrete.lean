@@ -121,8 +121,10 @@ variable (R : Type*) [CommRing R]
 
 namespace HeckeOperator
 
+
 variable {F D S} in
 set_option maxSynthPendingDepth 1 in
+set_option maxHeartbeats 400000 in
 open scoped TensorProduct.RightActions in
 /-- The Hecke operator T_v as an R-linear map from R-valued quaternionic weight 2
 automorphic forms of level U_1(S).
@@ -139,6 +141,7 @@ noncomputable def T (v : HeightOneSpectrum (𝓞 F)) :
 
 variable {F D} in
 set_option maxSynthPendingDepth 1 in
+set_option maxHeartbeats 400000 in
 open scoped TensorProduct.RightActions in
 /-- The Hecke operator U_{v,α} associated to the matrix (α 0;0 1) at v,
 considered as an R-linear map from R-valued quaternionic weight 2
@@ -185,6 +188,7 @@ end HeckeOperator
 
 open HeckeOperator
 
+set_option maxHeartbeats 400000 in
 /-- `HeckeAlgebra F D r S R` is the Hecke algebra associated to the weight 2
 `R`-valued automorphic forms associated to the discriminant 1 totally definite
 quaternion algebra `D` over the totally real field `F`, of level `U₁(S)` where `S` is
@@ -215,11 +219,13 @@ def HeckeAlgebra : Type _ :=
 
 namespace HeckeAlgebra
 
+set_option maxHeartbeats 400000 in
 noncomputable instance instRing :
     Ring (HeckeAlgebra F D r S R) := inferInstanceAs <|
   Ring (Algebra.adjoin R _ : Subalgebra R (WeightTwoAutomorphicFormOfLevel (U1 r S) R →ₗ[R]
       WeightTwoAutomorphicFormOfLevel (U1 r S) R))
 
+set_option maxHeartbeats 400000 in
 noncomputable instance instAlgebra :
     Algebra R (HeckeAlgebra F D r S R) := inferInstanceAs <|
   Algebra R (Algebra.adjoin R _ : Subalgebra R (WeightTwoAutomorphicFormOfLevel (U1 r S) R →ₗ[R]

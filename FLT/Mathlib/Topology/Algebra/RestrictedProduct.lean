@@ -1,8 +1,9 @@
 import Mathlib.Topology.Algebra.RestrictedProduct
 import Mathlib.Topology.Algebra.ContinuousMonoidHom
 import Mathlib.Topology.Instances.Matrix
+import Mathlib.Algebra.Group.Submonoid.Units
+import Mathlib.Algebra.Module.Pi
 import FLT.Mathlib.Topology.Algebra.Group.Units
-
 
 namespace RestrictedProduct
 
@@ -28,7 +29,54 @@ lemma mul_apply {S : ι → Type*} [(i : ι) → SetLike (S i) (R i)] {B : (i : 
 variable {S : ι → Type*} -- subobject type
 variable [Π i, SetLike (S i) (R i)]
 variable {B : Π i, S i}
-variable {ℱ : Filter ι}
+/-- The coercion from the restricted product of monoids `A i` to the (normal) product
+is a monoid homomorphism. -/
+@[to_additive "The coercion from the restricted product of additive monoids `A i` to the
+(normal) product is an additive monoid homomorphism."]
+def coeMonoidHom {ι : Type*} {𝓕 : Filter ι} {A : ι → Type*} [∀ i, Monoid (A i)]
+    {S : ι → Type*} [∀ i, SetLike (S i) (A i)] [∀ i, SubmonoidClass (S i) (A i)]
+    {B : Π i, S i} : Πʳ i, [A i, B i]_[𝓕] →* Π i, A i where
+  toFun := (↑)
+  map_one' := rfl
+  map_mul' _ _ := rfl
+
+section CommMonoid
+
+-- toAdditive broken because no toAdditive here
+/-
+instance [Π i, Monoid (R i)] [∀ i, SubmonoidClass (S i) (R i)] :
+    Pow (Πʳ i, [R i, B i]_[𝓕]) ℕ where
+  pow x n := ⟨fun i ↦ x i ^ n, x.2.mono fun _ hi ↦ pow_mem hi n⟩
+-/
+variable {ι : Type*} {𝓕 : Filter ι} {A : ι → Type*} [∀ i, CommMonoid (A i)]
+    {S : ι → Type*} [∀ i, SetLike (S i) (A i)] [∀ i, SubmonoidClass (S i) (A i)]
+    {B : Π i, S i} in
+/-- restricted product of additive commutative monoids is an additive commutative monoid -/
+--@[to_additive]
+instance instCommMonoid: CommMonoid (Πʳ i, [A i, B i]_[𝓕]) :=
+  DFunLike.coe_injective.commMonoid _ rfl (fun _ _ ↦ rfl) (fun _ _ ↦ rfl)
+
+variable {ι : Type*} {𝓕 : Filter ι} {A : ι → Type*} [∀ i, AddCommMonoid (A i)]
+    {S : ι → Type*} [∀ i, SetLike (S i) (A i)] [∀ i, AddSubmonoidClass (S i) (A i)]
+    {B : Π i, S i} in
+/-- restricted product of additive commutative monoids is an additive commutative monoid -/
+instance instAddCommMonoid: AddCommMonoid (Πʳ i, [A i, B i]_[𝓕]) :=
+  DFunLike.coe_injective.addCommMonoid _ rfl (fun _ _ ↦ rfl) (fun _ _ ↦ rfl)
+
+end CommMonoid
+
+section Module
+
+variable {ι : Type*} {𝓕 : Filter ι} {R : Type*} [Semiring R]
+{A : ι → Type*} [∀ i, AddCommMonoid (A i)] [∀ i, Module R (A i)]
+variable {S : ι → Type*}
+variable [∀ i, SetLike (S i) (A i)]
+  [∀ i, AddSubmonoidClass (S i) (A i)] [∀ i, SMulMemClass (S i) R (A i)]
+variable {B : Π i, S i}
+instance : Module R (Πʳ i, [A i, B i]_[𝓕]) :=
+  DFunLike.coe_injective.module R (M := Π i, A i) coeAddMonoidHom (fun _ _ ↦ rfl)
+
+end Module
 
 @[simp]
 lemma one_apply [Π i, One (R i)] [∀ i, OneMemClass (S i) (R i)] {i : ι} :
@@ -57,6 +105,34 @@ def congrRight (φ : (i : ι) → G i → H i)
     (hφ : ∀ᶠ i in ℱ, Set.MapsTo (φ i) (C i) (D i))
     (x : Πʳ i, [G i, C i]_[ℱ]) : (Πʳ i, [H i, D i]_[ℱ]) :=
   map G H id Filter.tendsto_id φ hφ x
+
+
+variable {ι₁ ι₂ : Type*}
+variable (R₁ : ι₁ → Type*) (R₂ : ι₂ → Type*)
+variable {𝓕₁ : Filter ι₁} {𝓕₂ : Filter ι₂}
+variable {A₁ : (i : ι₁) → Set (R₁ i)} {A₂ : (i : ι₂) → Set (R₂ i)}
+variable {S₁ : ι₁ → Type*} {S₂ : ι₂ → Type*}
+variable [Π i, SetLike (S₁ i) (R₁ i)] [Π j, SetLike (S₂ j) (R₂ j)]
+variable {B₁ : Π i, S₁ i} {B₂ : Π j, S₂ j}
+variable (f : ι₂ → ι₁) (hf : Filter.Tendsto f 𝓕₂ 𝓕₁)
+variable {A : Type*} [Semiring A]
+variable [Π i, AddCommMonoid (R₁ i)] [Π i, AddCommMonoid (R₂ i)] [Π i, Module A (R₁ i)]
+    [Π i, Module A (R₂ i)] [∀ i, AddSubmonoidClass (S₁ i) (R₁ i)]
+    [∀ i, AddSubmonoidClass (S₂ i) (R₂ i)] [∀ i, SMulMemClass (S₁ i) A (R₁ i)]
+    [∀ i, SMulMemClass (S₂ i) A (R₂ i)]
+    (φ : ∀ j, R₁ (f j) →ₗ[A] R₂ j)
+    (hφ : ∀ᶠ j in 𝓕₂, Set.MapsTo (φ j) (B₁ (f j)) (B₂ j))
+
+def mapLinearMap : Πʳ i, [R₁ i, B₁ i]_[𝓕₁] →ₗ[A] Πʳ j, [R₂ j, B₂ j]_[𝓕₂] where
+  __ := mapAddMonoidHom R₁ R₂ f hf (fun j ↦ φ j) hφ
+  map_smul' a f := by
+    ext i
+    apply map_smul (φ i)
+
+@[simp]
+lemma mapLinearMap_apply (x : Πʳ i, [R₁ i, B₁ i]_[𝓕₁]) (j : ι₂) :
+    x.mapLinearMap R₁ R₂ f hf φ hφ j = φ j (x (f j)) :=
+  rfl
 
 end RestrictedProduct
 
@@ -143,6 +219,38 @@ def ContinuousMonoidHom.restrictedProductCongrRight (φ : (i : ι) → G i →�
   __ := MonoidHom.restrictedProductCongrRight (fun i ↦ φ i) hφ
   continuous_toFun := by exact
     Continuous.restrictedProduct_congrRight (φ := fun i ↦ φ i) hφ (fun i ↦ (φ i).continuous)
+
+variable [Π i, Monoid (G i)] [Π i, SubmonoidClass (S i) (G i)]
+    [Π i, Monoid (H i)] [Π i, SubmonoidClass (T i) (H i)] in
+/-- The `MulEquiv` between restricted products built from `MulEquiv`s on the factors. -/
+@[to_additive "The `AddEquiv` between restricted products built from `AddEquiv`s on the factors."]
+def MulEquiv.restrictedProductCongrRight (φ : (i : ι) → G i ≃* H i)
+    (hφ : ∀ᶠ i in ℱ, Set.BijOn (φ i) (A i) (B i)) :
+    (Πʳ i, [G i, A i]_[ℱ]) ≃* (Πʳ i, [H i, B i]_[ℱ]) where
+  __ := MonoidHom.restrictedProductCongrRight (fun i ↦ φ i)
+    (by filter_upwards [hφ]; exact fun i ↦ Set.BijOn.mapsTo)
+  invFun := MonoidHom.restrictedProductCongrRight (fun i ↦ (φ i).symm)
+    (by filter_upwards [hφ]; exact fun i ↦ Set.BijOn.mapsTo ∘ Set.BijOn.equiv_symm)
+  left_inv x := by
+    ext i
+    exact MulEquiv.symm_apply_apply _ _
+  right_inv x := by
+    ext i
+    exact MulEquiv.apply_symm_apply _ _
+
+variable {R : Type*} [Semiring R] [Π i, AddCommMonoid (G i)] [Π i, AddSubmonoidClass (S i) (G i)]
+    [Π i, Module R (G i)] [Π i, SMulMemClass (S i) R (G i)]
+    [Π i, AddCommMonoid (H i)] [Π i, AddSubmonoidClass (T i) (H i)]
+    [Π i, Module R (H i)] [Π i, SMulMemClass (T i) R (H i)] in
+/-- The `LinearEquiv` between restricted products built from `LinearEquiv`s on the factors. -/
+def LinearEquiv.restrictedProductCongrRight (φ : (i : ι) → G i ≃ₗ[R] H i)
+    (hφ : ∀ᶠ i in ℱ, Set.BijOn (φ i) (A i) (B i)) :
+    (Πʳ i, [G i, A i]_[ℱ]) ≃ₗ[R] (Πʳ i, [H i, B i]_[ℱ]) where
+  __ := AddEquiv.restrictedProductCongrRight (fun i ↦ (φ i).toAddEquiv)
+    (by filter_upwards [hφ]; exact fun i ↦ id)
+  map_smul' m x := by
+    ext i
+    apply map_smul
 
 variable [Π i, Monoid (G i)] [Π i, SubmonoidClass (S i) (G i)]
     [Π i, Monoid (H i)] [Π i, SubmonoidClass (T i) (H i)]
