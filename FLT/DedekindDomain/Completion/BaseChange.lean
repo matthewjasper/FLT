@@ -767,43 +767,6 @@ end ModuleTopology
 
 section RamificationInertia
 
-/-- There are only finitely many nonzero primes of B above a nonzero prime of A. -/
-noncomputable def Extension.fintype : Fintype (Extension B v) :=
-  have := Extension.finite A K L B v
-  Fintype.ofFinite <| Extension B v
-
-omit [IsIntegralClosure B A L] [FiniteDimensional K L] in
-/-- `Ideal.sum_ramification_inertia`, rewritten as a sum over extensions. -/
-lemma _root_.Ideal.sum_ramification_inertia_extensions [Module.Finite A B] :
-    letI := Extension.fintype A K L B v
-    ∑ (w : Extension B v), Ideal.ramificationIdx (algebraMap A B) (v.asIdeal) (w.val.asIdeal)
-      * (v.asIdeal).inertiaDeg (w.val.asIdeal) = Module.finrank K L := by
-  have := v.isMaximal
-  have := noZeroSMulDivisors A K L B
-  -- Use Ideal.sum_ramification_inertia to make this an equivalence of two sums.
-  rw [← Ideal.sum_ramification_inertia B v.asIdeal K L v.ne_bot]
-  -- Check that the sums are equal via a bijection
-  apply Finset.sum_nbij (fun w ↦ w.val.asIdeal)
-  . rintro ⟨a, rfl⟩ -
-    rw [← Finset.mem_coe, coe_primesOverFinset (comap A a).ne_bot]
-    exact ⟨a.isPrime, ⟨rfl⟩⟩
-  . apply Function.Injective.injOn
-    exact fun _ _ hw ↦ Subtype.ext <| HeightOneSpectrum.ext hw
-  . intro y hy
-    rw [coe_primesOverFinset v.ne_bot B] at hy
-    obtain ⟨hprime, ⟨hyover⟩⟩ := hy
-    have hybot : y ≠ ⊥ := by
-      rw [Ideal.under_def] at hyover
-      intro hbot
-      apply v.ne_bot
-      rw [hyover, hbot]
-      exact Ideal.comap_bot_of_injective _ (FaithfulSMul.algebraMap_injective _ _)
-    let w' : HeightOneSpectrum B := ⟨y, hprime, hybot⟩
-    have wcomap : comap A w' = v := HeightOneSpectrum.ext hyover.symm
-    let w : Extension B v := ⟨w', wcomap⟩
-    exact ⟨w, by simp, rfl⟩
-  . exact fun _ _ ↦ rfl
-
 lemma WithZero.ofAdd_neg_ofNat_pow (n : ℕ) :
     (WithZero.coe (Multiplicative.ofAdd (-n : ℤ))) = (Multiplicative.ofAdd (-1 : ℤ)) ^ n := by
   congr
